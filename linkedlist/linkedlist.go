@@ -1,9 +1,14 @@
 package linkedlist
 
-import "errors"
+import (
+	"bytes"
+	"errors"
+	"fmt"
+)
 
-var ErrNilNode = errors.New("Node cannot be nil")
-var ErrNilList = errors.New("List cannot be nil")
+var ErrSelfLinkNode = errors.New("attempted to self-link node")
+var ErrNilNode = errors.New("node cannot be nil")
+var ErrNilList = errors.New("list cannot be nil")
 
 // === NODE STUFF ===
 
@@ -16,11 +21,14 @@ type Node struct {
 }
 
 // Puts this node after the "other" node.
-// Panics if either node is nil.
+// Panics if either node is nil, or if node is equal.
 // This function does NOT replace the head/tail of a list.
 func (n *Node) putAfter(other *Node) {
 	if n == nil || other == nil {
 		panic(ErrNilNode)
+	}
+	if n == other {
+		panic(ErrSelfLinkNode)
 	}
 
 	n.remove()
@@ -29,15 +37,20 @@ func (n *Node) putAfter(other *Node) {
 		other.Next.Prev = n
 	}
 
+	n.Prev = other
+	n.Next = other.Next
 	other.Next = n
 }
 
 // Puts this node before the "other" node.
-// Panics if either node is nil.
+// Panics if either node is nil, or if node is equal.
 // This function does NOT replace the head/tail of a list.
 func (n *Node) putBefore(other *Node) {
 	if n == nil || other == nil {
 		panic(ErrNilNode)
+	}
+	if n == other {
+		panic(ErrSelfLinkNode)
 	}
 
 	n.remove()
@@ -46,6 +59,8 @@ func (n *Node) putBefore(other *Node) {
 		other.Prev.Next = n
 	}
 
+	n.Prev = other.Prev
+	n.Next = other
 	other.Prev = n
 }
 
@@ -62,6 +77,19 @@ func (n *Node) remove() {
 	if n.Prev != nil {
 		n.Prev.Next = n.Next
 	}
+	n.Next = nil
+	n.Prev = nil
+}
+
+// Implement fmt.Stringer
+func (n *Node) String() string {
+	if n == nil {
+		return "Node(nil)"
+	}
+	if s, ok := n.Value.(string); ok {
+		return fmt.Sprintf("Node(%q)", s)
+	}
+	return fmt.Sprintf("Node(%v)", n.Value)
 }
 
 // === LIST STUFF ===
@@ -71,13 +99,7 @@ func (n *Node) remove() {
 type List struct {
 	Head *Node
 	Tail *Node
-	size int
-}
-
-// Returns the size of the list. The size is kept track of,
-// so this operation works in constant time.
-func (l *List) Size() int {
-	return l.size
+	Size int
 }
 
 // Adds an element to the end of the list.
@@ -98,6 +120,8 @@ func (l *List) AddLast(elem interface{}) *Node {
 
 	l.Tail = newNode
 
+	l.Size++
+
 	return newNode
 }
 
@@ -110,7 +134,7 @@ func (l *List) AddFirst(elem interface{}) *Node {
 	newNode.Next = l.Head
 
 	if l.Head != nil {
-		l.Head.Next = newNode
+		l.Head.Prev = newNode
 	}
 
 	if l.Tail == nil {
@@ -119,10 +143,13 @@ func (l *List) AddFirst(elem interface{}) *Node {
 
 	l.Head = newNode
 
+	l.Size++
+
 	return newNode
 }
 
-// Inserts/Moves a node after another one. Panics if list or nodes are nil.
+// Inserts/Moves a node after another one. Does NOT update the size if you insert a node
+// from outside the list. Panics if list or nodes are nil, or if the nodes are equal.
 func (l *List) InsertAfter(toInsert, target *Node) {
 	if l == nil {
 		panic(ErrNilList)
@@ -131,20 +158,18 @@ func (l *List) InsertAfter(toInsert, target *Node) {
 		panic(ErrNilNode)
 	}
 
-	if l.Head == toInsert {
-		l.Head = toInsert.Next
-	}
-	if l.Tail == toInsert {
-		l.Tail = toInsert.Prev
-	}
+	l.Remove(toInsert)
 
 	toInsert.putAfter(target)
+	l.Size++ // Increment as we removed the node and added it back in.
+
 	if l.Tail == target {
 		l.Tail = toInsert
 	}
 }
 
-// Inserts/Moves a node before another one. Panics if list or nodes are nil.
+// Inserts/Moves a node before another one. Does NOT update the size if you insert a node
+// from outside the list. Panics if list or nodes are nil, or if the nodes are equal.
 func (l *List) InsertBefore(toInsert, target *Node) {
 	if l == nil {
 		panic(ErrNilList)
@@ -153,15 +178,10 @@ func (l *List) InsertBefore(toInsert, target *Node) {
 		panic(ErrNilNode)
 	}
 
-	if l.Head == toInsert {
-		l.Head = toInsert.Next
-	}
-	if l.Tail == toInsert {
-		l.Tail = toInsert.Prev
-	}
+	l.Remove(toInsert)
 
-	toInsert.putAfter(target)
-
+	toInsert.putBefore(target)
+	l.Size++ // Increment as we removed the node and added it back in.
 	if l.Head == target {
 		l.Head = toInsert
 	}
@@ -182,26 +202,44 @@ func (l *List) Remove(n *Node) {
 	if n == l.Tail {
 		l.Tail = n.Prev
 	}
-	if n.Next != nil {
-		n.Next.Prev = nil
-	}
-	if n.Prev != nil {
-		n.Prev.Next = nil
-	}
-	n.Next = nil
-	n.Prev = nil
-	n.Value = nil
+	n.remove()
+	l.Size--
 }
 
 // Returns the list as a slice.
 func (l *List) AsSlice() []interface{} {
-	slice := make([]interface{}, l.Size())
+	slice := make([]interface{}, l.Size)
 	current := l.Head
 
-	for i := 0; i < l.Size(); i++ {
+	for i := 0; i < l.Size; i++ {
 		slice[i] = current.Value
 		current = current.Next
 	}
 
 	return slice
+}
+
+// Implement fmt.Stringer
+func (l *List) String() string {
+	if l == nil {
+		return "{nil}"
+	}
+
+	counter := 0
+	var buffer bytes.Buffer
+	buffer.WriteString("{")
+	current := l.Head
+	for current != nil {
+		if current != l.Head {
+			buffer.WriteString(",")
+		}
+		buffer.WriteString(current.String())
+		if counter++; counter > 25 {
+			buffer.WriteString("...")
+			break
+		}
+		current = current.Next
+	}
+
+	return buffer.String()
 }
