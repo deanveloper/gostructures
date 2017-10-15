@@ -12,4 +12,4 @@ Current list of structures:
   * Stacks
   * Queues
   * Deques
-   Set up examples for documentation
+  * Set up examples for documentation
