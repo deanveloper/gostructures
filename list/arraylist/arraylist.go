@@ -136,6 +136,11 @@ func (l *List) AsSlice() []interface{} {
 	return result
 }
 
+// implement fmt.Stringer
+func (l *List) String() string {
+	return fmt.Sprint(l.arr)
+}
+
 // === PRIVATE METHODS ===
 
 // Copies the array into itself with an offset of shamt.
