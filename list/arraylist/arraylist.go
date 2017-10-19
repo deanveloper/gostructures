@@ -1,7 +1,10 @@
 // A package that provides an implementation of an ArrayList.
 package arraylist
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var ErrOutOfBounds error = errors.New("index out of bounds")
 

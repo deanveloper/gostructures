@@ -1,5 +1,12 @@
 package arraystack
 
+import (
+	"errors"
+	"fmt"
+
+	"github.com/deanveloper/gostructures/list/arraylist"
+)
+
 var ErrEmptyStack error = errors.New("the stack is empty")
 
 type Stack struct {
